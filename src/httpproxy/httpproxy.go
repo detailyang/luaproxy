@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:35:16
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-19 17:13:23
+* @Last Modified time: 2016-02-19 20:58:14
  */
 
 package httpproxy
@@ -54,6 +54,31 @@ func (self *HttpProxy) ListenAndServeTLS(addr, certfile, keyfile string) {
 	}
 }
 
+func (self *HttpProxy) getLuaEnvMap(goreq *http.Request) luar.Map {
+	host, port, err := net.SplitHostPort(goreq.RemoteAddr)
+	if err != nil {
+		log.Println("split error ", err)
+	}
+	r := self.redispool.Get()
+	defer r.Close()
+
+	username, err := redis.String(r.Do("hget", host, "username"))
+	if err != nil && username != "" {
+		log.Printf("get %s username error ", err)
+	}
+	if username == "" {
+		username = "hijack"
+	}
+
+	env := luar.Map{
+		"host":     host,
+		"port":     port,
+		"username": username,
+	}
+
+	return env
+}
+
 func (self *HttpProxy) loadLuaCode(luaplugintype int, ip string) []string {
 	r := self.redispool.Get()
 	defer r.Close()
@@ -97,20 +122,18 @@ func (self *HttpProxy) request(goreq *http.Request) *http.Request {
 	goreq.URL.Host = goreq.Host
 	goreq.RequestURI = ""
 	luareq := utils.GoReqToLuaReq(goreq)
+	luaenv := self.getLuaEnvMap(goreq)
 
 	luavm := luar.Init()
 	defer luavm.Close()
 	// register context
 	luar.Register(luavm, "", luar.Map{
 		"req": luareq,
+		"env": luaenv,
 	})
-	host, _, err := net.SplitHostPort(goreq.RemoteAddr)
-	if err != nil {
-		log.Println("split error ", err)
-	}
 
 	// load request
-	for _, luacode := range self.loadLuaCode(LuaRequestType, host) {
+	for _, luacode := range self.loadLuaCode(LuaRequestType, luaenv["host"].(string)) {
 		if luacode == "" {
 			continue
 		}
@@ -127,7 +150,7 @@ func (self *HttpProxy) request(goreq *http.Request) *http.Request {
 	}
 
 	// load upstream
-	for _, luacode := range self.loadLuaCode(LuaUpstreamType, host) {
+	for _, luacode := range self.loadLuaCode(LuaUpstreamType, luaenv["host"].(string)) {
 		if luacode == "" {
 			continue
 		}
@@ -149,6 +172,7 @@ func (self *HttpProxy) request(goreq *http.Request) *http.Request {
 func (self *HttpProxy) response(goreq *http.Request, gores *http.Response) {
 	luareq := utils.GoReqToLuaReq(goreq)
 	luares := utils.GoResToLuaRes(gores)
+	luaenv := self.getLuaEnvMap(goreq)
 
 	luavm := luar.Init()
 	defer luavm.Close()
@@ -156,13 +180,10 @@ func (self *HttpProxy) response(goreq *http.Request, gores *http.Response) {
 	luar.Register(luavm, "", luar.Map{
 		"res": luares,
 		"req": luareq,
+		"env": luaenv,
 	})
 
-	host, _, err := net.SplitHostPort(goreq.RemoteAddr)
-	if err != nil {
-		log.Println("split error ", err)
-	}
-	for _, luacode := range self.loadLuaCode(LuaResponseType, host) {
+	for _, luacode := range self.loadLuaCode(LuaResponseType, luaenv["host"].(string)) {
 		if luacode == "" {
 			continue
 		}
@@ -193,8 +214,8 @@ func (self *HttpProxy) handle(protocol string) func(w http.ResponseWriter, r *ht
 			log.Println("request upstream error", err)
 			return
 		}
+		defer gores.Body.Close()
 		self.response(goreq, gores)
-
 		for k, v := range gores.Header {
 			for _, vv := range v {
 				w.Header().Add(k, vv)
@@ -202,14 +223,17 @@ func (self *HttpProxy) handle(protocol string) func(w http.ResponseWriter, r *ht
 		}
 		w.WriteHeader(gores.StatusCode)
 		body, err := ioutil.ReadAll(gores.Body)
-		if err != nil && gores.StatusCode < 300 && gores.StatusCode >= 400 {
-			log.Println("read body error ", err)
+		if err != nil {
+			if gores.StatusCode != 301 || gores.StatusCode != 302 {
+				log.Println("read body error ", err)
+			}
 			return
 		}
+		defer gores.Body.Close()
 		nw, err := w.Write(body)
 		if err != nil {
 			log.Println("write body error ", err)
 		}
-		log.Printf("read %d bytes to client", nw)
+		log.Printf("write %d bytes to client", nw)
 	}
 }

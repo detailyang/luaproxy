@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-12 21:35:29
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-19 17:13:07
+* @Last Modified time: 2016-02-19 20:42:35
  */
 
 package utils
@@ -71,7 +71,7 @@ func GoReqToLuaReq(r *http.Request) luar.Map {
 	req := luar.Map{
 		"url":          luar.Map{},
 		"query":        luar.Map{},
-		"upstream":     r.Host,
+		"upstream":     r.URL.Host,
 		"method":       r.Method,
 		"address":      r.RemoteAddr,
 		"header":       luar.Map{},
