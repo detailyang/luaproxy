@@ -9,6 +9,9 @@
       "key": "/Users/detailyang/art/opensource/personal/luaproxy/ssl/gateway-key.pem"
     }
   },
+  "server": {
+    "address": ":8888"
+  },
   "plugin": {
     "requestdir": "/Users/detailyang/art/opensource/personal/luaproxy/plugins/request",
     "responsedir": "/Users/detailyang/art/opensource/personal/luaproxy/plugins/response",

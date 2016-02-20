@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:34:23
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-19 13:57:43
+* @Last Modified time: 2016-02-20 18:17:19
  */
 
 package main
@@ -12,6 +12,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/spf13/viper"
 	"httpproxy"
+	"httpserver"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -111,6 +112,15 @@ func main() {
 		httpscert := v.GetString("proxy.https.cert")
 		httpskey := v.GetString("proxy.https.key")
 		hp.ListenAndServeTLS(httpsaddress, httpscert, httpskey)
+		wg.Done()
+	}()
+
+	hsaddress := v.GetString("server.address")
+	hs := httpserver.NewHttpServer(hsaddress)
+
+	wg.Add(1)
+	go func() {
+		hs.ListenAndServe()
 		wg.Done()
 	}()
 	wg.Wait()
