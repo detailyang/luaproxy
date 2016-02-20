@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:34:23
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-20 18:17:19
+* @Last Modified time: 2016-02-20 23:55:22
  */
 
 package main
@@ -116,7 +116,9 @@ func main() {
 	}()
 
 	hsaddress := v.GetString("server.address")
-	hs := httpserver.NewHttpServer(hsaddress)
+	hsstaticdir := v.GetString("server.staticdir")
+	hsindexhtml := v.GetString("server.indexhtml")
+	hs := httpserver.NewHttpServer(hsaddress, hsstaticdir, hsindexhtml)
 
 	wg.Add(1)
 	go func() {

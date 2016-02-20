@@ -10,6 +10,8 @@
     }
   },
   "server": {
+    "staticdir": "/Users/detailyang/art/opensource/personal/luaproxy/static",
+    "indexhtml": "/Users/detailyang/art/opensource/personal/luaproxy/static/html/index.html",
     "address": ":8888"
   },
   "plugin": {
