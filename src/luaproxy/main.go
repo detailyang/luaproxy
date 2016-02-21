@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:34:23
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-20 23:55:22
+* @Last Modified time: 2016-02-21 20:24:00
  */
 
 package main
@@ -38,7 +38,6 @@ func main() {
 	raddress := v.GetString("redis.address")
 	rmaxidle := v.GetInt("redis.maxidle")
 	rmaxactive := v.GetInt("redis.maxactive")
-
 	redispool := &redis.Pool{
 		MaxIdle:   rmaxidle,
 		MaxActive: rmaxactive, // max number of connections
@@ -51,53 +50,12 @@ func main() {
 		},
 	}
 
-	luarequest := make(map[string]string)
 	requestdir := v.GetString("plugin.requestdir")
-	files, err := ioutil.ReadDir(requestdir)
-	if err != nil {
-		log.Println("read dir error", err)
-	}
-	for _, file := range files {
-		luacode, err := ioutil.ReadFile(filepath.Join(requestdir, file.Name()))
-		if err != nil {
-			log.Println("read file error ", err)
-			continue
-		}
-		luarequest[file.Name()] = string(luacode)
-	}
-
-	luaupstream := make(map[string]string)
 	upstreamdir := v.GetString("plugin.upstreamdir")
-	files, err = ioutil.ReadDir(upstreamdir)
-	if err != nil {
-		log.Println("read dir error", err)
-	}
-
-	for _, file := range files {
-		luacode, err := ioutil.ReadFile(filepath.Join(upstreamdir, file.Name()))
-		if err != nil {
-			log.Println("read file error ", err)
-			continue
-		}
-		luaupstream[file.Name()] = string(luacode)
-	}
-
-	luaresponse := make(map[string]string)
 	responsedir := v.GetString("plugin.responsedir")
-	files, err = ioutil.ReadDir(responsedir)
-	if err != nil {
-		log.Println("read dir error", err)
-	}
-	for _, file := range files {
-		luacode, err := ioutil.ReadFile(filepath.Join(responsedir, file.Name()))
-		if err != nil {
-			log.Println("read file error ", err)
-			continue
-		}
-		luaresponse[file.Name()] = string(luacode)
-	}
+	luaplguin := loadLuaCodestoMem(requestdir, upstreamdir, responsedir)
 
-	hp := httpproxy.NewHttpProxy(redispool, luarequest, luaupstream, luaresponse)
+	hp := httpproxy.NewHttpProxy(redispool, luaplguin)
 
 	wg.Add(1)
 	go func() {
@@ -126,4 +84,27 @@ func main() {
 		wg.Done()
 	}()
 	wg.Wait()
+}
+
+func loadLuaCodestoMem(requestdir, upstreamdir, responsedir string) map[string]string {
+	luaplugin := make(map[string]string)
+	readfiles := func(dir string) {
+		files, err := ioutil.ReadDir(dir)
+		if err != nil {
+			log.Println("read dir error", err)
+		}
+		for _, file := range files {
+			luacode, err := ioutil.ReadFile(filepath.Join(dir, file.Name()))
+			if err != nil {
+				log.Println("read file error ", err)
+				continue
+			}
+			luaplugin[file.Name()] = string(luacode)
+		}
+	}
+	readfiles(requestdir)
+	readfiles(upstreamdir)
+	readfiles(responsedir)
+
+	return luaplugin
 }

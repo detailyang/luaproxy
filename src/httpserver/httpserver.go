@@ -2,13 +2,12 @@
 * @Author: detailyang
 * @Date:   2016-02-20 18:09:48
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-20 23:57:47
+* @Last Modified time: 2016-02-21 19:31:01
  */
 
 package httpserver
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 )
@@ -33,7 +32,7 @@ func (self *HttpServer) ListenAndServe() {
 		http.StripPrefix("/static/", http.FileServer(http.Dir(self.staticdir))))
 
 	// dont use another web router, we just want simple router:)
-	http.HandleFunc("/api/", self.api)
+	http.HandleFunc("/api/luacodes", self.luacodes)
 
 	// index html
 	http.HandleFunc("/", self.view)
@@ -43,8 +42,8 @@ func (self *HttpServer) ListenAndServe() {
 	}
 }
 
-func (self *HttpServer) api(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "api")
+func (self *HttpServer) luacodes(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func (self *HttpServer) view(w http.ResponseWriter, r *http.Request) {

@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:35:16
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-19 20:58:14
+* @Last Modified time: 2016-02-21 20:31:08
  */
 
 package httpproxy
@@ -25,18 +25,14 @@ const (
 )
 
 type HttpProxy struct {
-	redispool   *redis.Pool
-	luarequest  map[string]string
-	luaresponse map[string]string
-	luaupstream map[string]string
+	redispool *redis.Pool
+	luaplguin map[string]string
 }
 
-func NewHttpProxy(redispool *redis.Pool, luarequest, luaupstream, luaresponse map[string]string) *HttpProxy {
+func NewHttpProxy(redispool *redis.Pool, luaplugin map[string]string) *HttpProxy {
 	return &HttpProxy{
-		redispool:   redispool,
-		luarequest:  luarequest,
-		luaresponse: luaresponse,
-		luaupstream: luaupstream,
+		redispool: redispool,
+		luaplguin: luaplugin,
 	}
 }
 
@@ -85,21 +81,16 @@ func (self *HttpProxy) loadLuaCode(luaplugintype int, ip string) []string {
 
 	var err error
 	var csv string
-	var m *map[string]string
 
 	switch luaplugintype {
 	case LuaRequestType:
 		csv, err = redis.String(r.Do("hget", ip, "request"))
-		m = &self.luarequest
 	case LuaResponseType:
 		csv, err = redis.String(r.Do("hget", ip, "response"))
-		m = &self.luaresponse
 	case LuaUpstreamType:
 		csv, err = redis.String(r.Do("hget", ip, "upstream"))
-		m = &self.luaupstream
 	default:
 		csv, err = redis.String(r.Do("hget", ip, "request"))
-		m = &self.luarequest
 	}
 
 	if err != nil && csv != "" {
@@ -108,9 +99,10 @@ func (self *HttpProxy) loadLuaCode(luaplugintype int, ip string) []string {
 	}
 
 	rv := make([]string, 0)
-	ids := strings.Split(csv, ",")
-	for _, id := range ids {
-		rv = append(rv, (*m)[id])
+	filenames := strings.Split(csv, ",")
+	for _, filename := range filenames {
+		code := self.luaplguin[filename]
+		rv = append(rv, code)
 	}
 
 	return rv
@@ -187,6 +179,7 @@ func (self *HttpProxy) response(goreq *http.Request, gores *http.Response) {
 		if luacode == "" {
 			continue
 		}
+		log.Println(luacode)
 		err := luavm.DoString(luacode)
 		if err != nil {
 			log.Println("lua get error ", err)
