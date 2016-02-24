@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-20 18:09:48
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-21 23:47:35
+* @Last Modified time: 2016-02-24 23:58:23
  */
 
 package httpserver
@@ -41,6 +41,8 @@ func (self *HttpServer) ListenAndServe() {
 
 	// index html
 	http.HandleFunc("/", self.view)
+
+	log.Printf("http server listen %s", self.addr)
 	err := http.ListenAndServe(self.addr, nil)
 	if err != nil {
 		log.Println("http server listen error ", self.addr, err)
@@ -68,7 +70,6 @@ func (self *HttpServer) luapluginlist(w http.ResponseWriter, r *http.Request) {
 }
 
 func (self *HttpServer) luaplugindetail(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL.Path)
 	lastslash := strings.LastIndex(r.URL.Path, "/")
 	if lastslash == -1 {
 		w.WriteHeader(http.StatusNotFound)

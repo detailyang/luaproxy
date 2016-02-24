@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:35:16
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-21 20:31:08
+* @Last Modified time: 2016-02-25 00:12:43
  */
 
 package httpproxy
@@ -25,28 +25,33 @@ const (
 )
 
 type HttpProxy struct {
-	redispool *redis.Pool
-	luaplguin map[string]string
+	redispool           *redis.Pool
+	luaplguin           map[string]string
+	httpsaddr, httpaddr string
 }
 
-func NewHttpProxy(redispool *redis.Pool, luaplugin map[string]string) *HttpProxy {
+func NewHttpProxy(redispool *redis.Pool, httpaddr, httpsaddr string, luaplugin map[string]string) *HttpProxy {
 	return &HttpProxy{
 		redispool: redispool,
 		luaplguin: luaplugin,
+		httpaddr:  httpaddr,
+		httpsaddr: httpsaddr,
 	}
 }
 
-func (self *HttpProxy) ListenAndServe(addr string) {
-	err := http.ListenAndServe(addr, http.HandlerFunc(self.handle("http")))
+func (self *HttpProxy) ListenAndServe() {
+	log.Printf("http listen on %s", self.httpaddr)
+	err := http.ListenAndServe(self.httpaddr, http.HandlerFunc(self.handle("http")))
 	if err != nil {
-		log.Println("http listen error ", addr, err)
+		log.Println("http listen error ", self.httpaddr, err)
 	}
 }
 
-func (self *HttpProxy) ListenAndServeTLS(addr, certfile, keyfile string) {
-	err := http.ListenAndServeTLS(addr, certfile, keyfile, http.HandlerFunc(self.handle("https")))
+func (self *HttpProxy) ListenAndServeTLS(certfile, keyfile string) {
+	log.Printf("https listen on %s", self.httpsaddr)
+	err := http.ListenAndServeTLS(self.httpsaddr, certfile, keyfile, http.HandlerFunc(self.handle("https")))
 	if err != nil {
-		log.Println("https listen error ", addr, err)
+		log.Println("https listen error ", self.httpsaddr, err)
 	}
 }
 
@@ -193,10 +198,26 @@ func (self *HttpProxy) response(goreq *http.Request, gores *http.Response) {
 	utils.GoResMergeLuaRes(gores, luares)
 }
 
+func (self *HttpProxy) isKillSelf(hostport string) bool {
+	_, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return true
+	}
+	if port == self.httpaddr || port == self.httpsaddr {
+		return true
+	}
+
+	return false
+}
+
 func (self *HttpProxy) handle(protocol string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Scheme = protocol
 		goreq := self.request(r)
+		if self.isKillSelf(goreq.URL.Host) == true {
+			http.Error(w, "you shouldnt proxy server itself:(, please set the right upstream", 400)
+			return
+		}
 		client := &http.Client{}
 		client.CheckRedirect = func(goreq *http.Request, via []*http.Request) error {
 			return utils.ErrHttpRedirect
@@ -208,6 +229,7 @@ func (self *HttpProxy) handle(protocol string) func(w http.ResponseWriter, r *ht
 			return
 		}
 		defer gores.Body.Close()
+
 		self.response(goreq, gores)
 		for k, v := range gores.Header {
 			for _, vv := range v {

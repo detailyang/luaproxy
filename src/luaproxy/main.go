@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-11 17:34:23
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-21 21:05:47
+* @Last Modified time: 2016-02-25 00:07:07
  */
 
 package main
@@ -55,21 +55,21 @@ func main() {
 	responsedir := v.GetString("plugin.responsedir")
 	luaplguin := loadLuaCodestoMem(requestdir, upstreamdir, responsedir)
 
-	hp := httpproxy.NewHttpProxy(redispool, luaplguin)
+	httpsaddress := v.GetString("proxy.https.address")
+	httpaddress := v.GetString("proxy.http.address")
+	hp := httpproxy.NewHttpProxy(redispool, httpaddress, httpsaddress, luaplguin)
 
 	wg.Add(1)
 	go func() {
-		httpaddress := v.GetString("proxy.http.address")
-		hp.ListenAndServe(httpaddress)
+		hp.ListenAndServe()
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		httpsaddress := v.GetString("proxy.https.address")
 		httpscert := v.GetString("proxy.https.cert")
 		httpskey := v.GetString("proxy.https.key")
-		hp.ListenAndServeTLS(httpsaddress, httpscert, httpskey)
+		hp.ListenAndServeTLS(httpscert, httpskey)
 		wg.Done()
 	}()
 
