@@ -2,7 +2,7 @@
 * @Author: detailyang
 * @Date:   2016-02-20 18:09:48
 * @Last Modified by:   detailyang
-* @Last Modified time: 2016-02-25 00:47:13
+* @Last Modified time: 2016-02-26 23:05:09
  */
 
 package httpserver
@@ -11,6 +11,7 @@ import (
 	"github.com/Jeffail/gabs"
 	"github.com/garyburd/redigo/redis"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -42,7 +43,6 @@ func (self *HttpServer) ListenAndServe() {
 	http.HandleFunc("/api/luaplugins/", self.luaplugindetail)
 	http.HandleFunc("/api/luaplugins", self.luapluginlist)
 
-	//
 	http.HandleFunc("/api/ip/", self.ip)
 
 	// index html
@@ -85,14 +85,11 @@ func (self *HttpServer) luaplugindetail(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(self.luaplugin[r.URL.Path[lastslash+1:]]))
 }
 
-func (self *HttpServer) ip(w http.ResponseWriter, r *http.Request) {
-	lastslash := strings.LastIndex(r.URL.Path, "/")
-	if lastslash == -1 {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("404 not found"))
-		return
+func (self *HttpServer) ipGet(w http.ResponseWriter, r *http.Request) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		log.Println("split host port error ", r.RemoteAddr)
 	}
-	ip := r.URL.Path[lastslash+1:]
 
 	jsonObj := gabs.New()
 	jsonObj.SetP(0, "code")
@@ -103,28 +100,28 @@ func (self *HttpServer) ip(w http.ResponseWriter, r *http.Request) {
 
 	red := self.redispool.Get()
 	// request
-	requestcommasep, err := redis.String(red.Do("HGET", ip, "request"))
-	if err != nil {
-		log.Printf("hget %s request error %s", ip, err.Error())
+	requestcommasep, err := redis.String(red.Do("HGET", host, "request"))
+	if err != nil && requestcommasep != "" {
+		log.Printf("hget %s request error %s", host, err.Error())
 	} else if requestcommasep != "" {
 		for _, v := range strings.Split(requestcommasep, ",") {
 			jsonObj.ArrayAppendP(v, "data.request")
 		}
 	}
 	// upstream
-	upstreamcommasep, err := redis.String(red.Do("HGET", ip, "upstream"))
-	if err != nil {
-		log.Printf("hget %s upstream error %s", ip, err.Error())
-	} else if upstreamcommasep != "" {
+	upstreamcommasep, err := redis.String(red.Do("HGET", host, "upstream"))
+	if err != nil && upstreamcommasep != "" {
+		log.Printf("hget %s upstream error %s", host, err.Error())
+	} else {
 		for _, v := range strings.Split(upstreamcommasep, ",") {
 			jsonObj.ArrayAppendP(v, "data.upstream")
 		}
 	}
 	// response
-	responsecommasep, err := redis.String(red.Do("HGET", ip, "response"))
-	if err != nil {
-		log.Printf("hget %s response error %s", ip, err.Error())
-	} else if responsecommasep != "" {
+	responsecommasep, err := redis.String(red.Do("HGET", host, "response"))
+	if err != nil && responsecommasep != "" {
+		log.Printf("hget %s response error %s", host, err.Error())
+	} else {
 		for _, v := range strings.Split(responsecommasep, ",") {
 			jsonObj.ArrayAppendP(v, "data.response")
 		}
@@ -132,6 +129,39 @@ func (self *HttpServer) ip(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(jsonObj.Bytes())
+}
+
+func (self *HttpServer) ipPost(w http.ResponseWriter, r *http.Request) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		log.Println("split host port error ", r.RemoteAddr)
+	}
+
+	err = r.ParseForm()
+	if err != nil {
+		log.Println("parse form error ", err)
+	}
+
+	red := self.redispool.Get()
+	for _, kind := range []string{"request", "upstream", "response"} {
+		_, err = red.Do("HSET", host, kind, r.Form.Get(kind))
+		if err != nil {
+			log.Printf("HSET %s request error %s", host, err.Error())
+		}
+	}
+
+	w.Write([]byte("abcd"))
+}
+
+func (self *HttpServer) ip(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		self.ipGet(w, r)
+	case "POST":
+		self.ipPost(w, r)
+	default:
+		self.ipGet(w, r)
+	}
 }
 
 func (self *HttpServer) view(w http.ResponseWriter, r *http.Request) {
