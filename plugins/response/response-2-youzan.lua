@@ -29,7 +29,7 @@ local inject = [==[
                     '<p style="position: absolute;right: 10px;top: 10px;color: #999;font-size: 10px;">© pipboy</p>' +
                   '</div>' +
                   '<div style="margin-top:250px;padding: 10px">' +
-                    '<img src="http://login.qima-inc.com/api/users/#username#/avatar" style="width:30px;height:30px;border-radius:3px;float:left">' +
+                    '<img src="http://login.xx.com/api/users/#username#/avatar" style="width:30px;height:30px;border-radius:3px;float:left">' +
                     '<div style="margin-top: 11px;margin-left: 40px;color:#999;font-size:12px">' +
                       '<span>username: #username#</span>' +
                       '<span style="margin-left:10px;">upstream: #upstream#</span>' +
