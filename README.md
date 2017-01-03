@@ -1,0 +1,2 @@
+# luaproxy
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/ea2c56402f1e41dabb4b4f2cee49f671)](https://www.codacy.com/app/detailyang/luaproxy?utm_source=github.com&utm_medium=referral&utm_content=detailyang/luaproxy&utm_campaign=badger)
